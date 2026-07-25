@@ -1,4 +1,4 @@
-# zerosily0.github.io
+# zerosily0-del.github.io
 <!DOCTYPE html>
 <html lang="ko">
 <head>
