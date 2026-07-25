@@ -171,7 +171,7 @@ function renderCode(mode) {
   const initTok  = `<span class="tok">let i = 0</span>`;
   const condTok  = `<span class="tok${mode === 'cond' ? ' hl-cond' : ''}">i &lt; 5</span>`;
   const incrTok  = `<span class="tok${mode === 'incr' ? ' hl-incr' : ''}">i++</span>`;
-  const bodyTok  = `<span class="tok${mode === 'body' ? ' hl-body' : ''}">  drawEllipse(i);</span>`;
+  const bodyTok  = `<span class="tok${mode === 'body' ? ' hl-body' : ''}">  ellipse(i,0,with,height);</span>`;
 
   codeEl.innerHTML =
     `<span class="line">for (${initTok}; ${condTok}; ${incrTok}) {</span>` +
