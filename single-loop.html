@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>단일 for문 시각화</title>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    background: #1e1e1e;
+    color: #ddd;
+    margin: 0;
+    padding: 32px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    max-width: 800px;
+    width: 100%;
+  }
+  .panel {
+    flex: 1;
+    min-width: 280px;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    background: #262626;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .circle {
+    aspect-ratio: 3 / 2;
+    border-radius: 50%;
+    background: #3a3a3a;
+    border: 1px solid #444;
+    transition: background .15s, transform .15s;
+  }
+  pre#code {
+    font-family: "Fira Code", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 2;
+    background: #262626;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-x: auto;
+  }
+  .line { display: block; padding: 2px 0; color: #aaa; }
+  .tok { padding: 2px 5px; border-radius: 4px; transition: background .15s, color .15s; }
+  .tok.hl-body { background: #3a6fd8; color: #fff; }
+  .tok.hl-cond { background: #b8860b; color: #fff; }
+  .tok.hl-incr { background: #2f9e6b; color: #fff; }
+  .vals {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .val-card {
+    flex: 1;
+    background: #262626;
+    border: 1px solid #3a3a3a;
+    border-radius: 12px;
+    padding: 12px 0;
+    text-align: center;
+    transition: transform .15s;
+  }
+  .val-card .label {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 4px;
+  }
+  .val-card b {
+    font-size: 26px;
+    color: #6ea8fe;
+    font-family: Menlo, Consolas, monospace;
+  }
+  .val-card.cond b { font-size: 18px; }
+  .val-card.cond.true b { color: #4fd18a; }
+  .val-card.cond.false b { color: #e2554c; }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    width: 100%;
+  }
+  button {
+    background: #333;
+    border: 1px solid #4a4a4a;
+    color: #ddd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button:hover { background: #3d3d3d; }
+  input[type="range"] { width: 130px; }
+  label { font-size: 13px; color: #999; }
+  .legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: #999;
+    flex-wrap: wrap;
+  }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="panel">
+    <div id="grid"></div>
+  </div>
+  <div class="panel">
+    <pre id="code"></pre>
+    <div class="vals">
+      <div class="val-card">
+        <div class="label">i</div>
+        <b id="ival">-</b>
+      </div>
+      <div class="val-card cond" id="condCard">
+        <div class="label">i &lt; 5</div>
+        <b id="condVal">-</b>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:#b8860b"></i>조건 검사</span>
+      <span><i class="dot" style="background:#3a6fd8"></i>본문 실행</span>
+      <span><i class="dot" style="background:#2f9e6b"></i>update (i++)</span>
+    </div>
+  </div>
+  <div class="controls">
+    <button id="playBtn" onclick="togglePlay()">▶ 재생</button>
+    <button onclick="resetSim()">↺ 리셋</button>
+    <label>속도</label>
+    <input type="range" id="speed" min="150" max="900" step="50" value="500">
+  </div>
+</div>
+
+<script>
+const N = 5;
+
+const grid = document.getElementById('grid');
+const codeEl = document.getElementById('code');
+const ival = document.getElementById('ival');
+const condCard = document.getElementById('condCard');
+const condVal = document.getElementById('condVal');
+const playBtn = document.getElementById('playBtn');
+const speedInput = document.getElementById('speed');
+
+let cells = [];
+for (let k = 0; k < N; k++) {
+  const d = document.createElement('div');
+  d.className = 'circle';
+  grid.appendChild(d);
+  cells.push(d);
+}
+
+// phase: 'check' -> 조건 검사, 'body' -> 본문 실행, 'update' -> i++
+let i = 0, phase = 'check', timer = null, playing = false;
+
+function renderCode(mode) {
+  const initTok  = `<span class="tok">let i = 0</span>`;
+  const condTok  = `<span class="tok${mode === 'cond' ? ' hl-cond' : ''}">i &lt; 5</span>`;
+  const incrTok  = `<span class="tok${mode === 'incr' ? ' hl-incr' : ''}">i++</span>`;
+  const bodyTok  = `<span class="tok${mode === 'body' ? ' hl-body' : ''}">  drawEllipse(i);</span>`;
+
+  codeEl.innerHTML =
+    `<span class="line">for (${initTok}; ${condTok}; ${incrTok}) {</span>` +
+    `<span class="line">${bodyTok}</span>` +
+    `<span class="line">}</span>`;
+}
+
+function updateCards(condition) {
+  ival.textContent = i < N ? i : (i === N ? N : '-');
+  if (condition === undefined) {
+    condCard.className = 'val-card cond';
+    condVal.textContent = '-';
+  } else {
+    condCard.className = 'val-card cond ' + (condition ? 'true' : 'false');
+    condVal.textContent = condition ? 'True' : 'False';
+  }
+}
+
+function step() {
+  if (phase === 'check') {
+    renderCode('cond');
+    const result = i < N;
+    updateCards(result);
+    if (!result) {
+      stopPlay();
+      return;
+    }
+    phase = 'body';
+  } else if (phase === 'body') {
+    renderCode('body');
+    const idx = i;
+    cells[idx].style.background = '#3a6fd8';
+    cells[idx].style.transform = 'scale(1.1)';
+    setTimeout(() => { cells[idx].style.transform = 'scale(1)'; }, 150);
+    phase = 'update';
+  } else if (phase === 'update') {
+    renderCode('incr');
+    i++;
+    ival.style.transform = 'scale(1.25)';
+    setTimeout(() => { ival.style.transform = 'scale(1)'; }, 150);
+    updateCards();
+    phase = 'check';
+  }
+}
+
+function togglePlay() {
+  playing = !playing;
+  if (playing) {
+    playBtn.textContent = '⏸ 일시정지';
+    timer = setInterval(step, Number(speedInput.value));
+  } else {
+    stopPlay();
+  }
+}
+
+function stopPlay() {
+  playing = false;
+  clearInterval(timer);
+  playBtn.textContent = '▶ 재생';
+}
+
+function resetSim() {
+  stopPlay();
+  i = 0; phase = 'check';
+  cells.forEach(c => { c.style.background = '#3a3a3a'; });
+  renderCode(null);
+  updateCards();
+}
+
+speedInput.addEventListener('input', () => {
+  if (playing) {
+    clearInterval(timer);
+    timer = setInterval(step, Number(speedInput.value));
+  }
+});
+
+resetSim();
+</script>
+
+</body>
+</html>
