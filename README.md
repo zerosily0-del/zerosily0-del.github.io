@@ -1,1 +1,241 @@
 # zerosily0.github.io
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>이중 for문 시각화</title>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    background: #1e1e1e;
+    color: #ddd;
+    margin: 0;
+    padding: 32px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    max-width: 800px;
+    width: 100%;
+  }
+  .panel {
+    flex: 1;
+    min-width: 280px;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    background: #262626;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .circle {
+    aspect-ratio: 3 / 2;
+    border-radius: 50%;
+    background: #3a3a3a;
+    border: 1px solid #444;
+    transition: background .15s, transform .15s;
+  }
+  pre#code {
+    font-family: "Fira Code", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 2;
+    background: #262626;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 0;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .line { display: block; padding: 2px 6px; border-radius: 4px; color: #aaa; }
+  .hl { background: #3a6fd8; color: #fff; }
+  .vals {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .val-card {
+    flex: 1;
+    background: #262626;
+    border: 1px solid #3a3a3a;
+    border-radius: 12px;
+    padding: 14px 0;
+    text-align: center;
+  }
+  .val-card .label {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 4px;
+  }
+  .val-card b {
+    font-size: 32px;
+    color: #6ea8fe;
+    font-family: Menlo, Consolas, monospace;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    width: 100%;
+  }
+  button {
+    background: #333;
+    border: 1px solid #4a4a4a;
+    color: #ddd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button:hover { background: #3d3d3d; }
+  input[type="range"] { width: 130px; }
+  label { font-size: 13px; color: #999; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="panel">
+    <div id="grid"></div>
+  </div>
+  <div class="panel">
+    <pre id="code"></pre>
+    <div class="vals">
+      <div class="val-card">
+        <div class="label">i</div>
+        <b id="ival">-</b>
+      </div>
+      <div class="val-card">
+        <div class="label">j</div>
+        <b id="jval">-</b>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <button id="playBtn" onclick="togglePlay()">▶ 재생</button>
+    <button onclick="resetSim()">↺ 리셋</button>
+    <label>속도</label>
+    <input type="range" id="speed" min="150" max="900" step="50" value="500">
+  </div>
+</div>
+
+<script>
+const N = 5;
+
+const lines = [
+  "for (let i = 0; i < 5; i++) {",
+  "  for (let j = 0; j < 5; j++) {",
+  "    drawEllipse(i, j);",
+  "  }",
+  "}"
+];
+
+// 각 논리적 단계(phase)에서 하이라이트할 줄 번호(들)
+const OUTER_HEADER = [0];
+const OUTER_INCREMENT = [0];
+const INNER_HEADER = [1];
+const INNER_INCREMENT = [1];
+const BODY = [2];
+const END = [4];
+
+const grid = document.getElementById('grid');
+const codeEl = document.getElementById('code');
+const ival = document.getElementById('ival');
+const jval = document.getElementById('jval');
+const playBtn = document.getElementById('playBtn');
+const speedInput = document.getElementById('speed');
+
+let cells = [];
+for (let k = 0; k < N * N; k++) {
+  const d = document.createElement('div');
+  d.className = 'circle';
+  grid.appendChild(d);
+  cells.push(d);
+}
+
+let i = 0, j = 0, phase = 0, timer = null, playing = false;
+
+function render(highlightLines) {
+  const hl = new Set(highlightLines || []);
+  codeEl.innerHTML = lines.map((l, idx) => {
+    const cls = hl.has(idx) ? 'line hl' : 'line';
+    return `<span class="${cls}">${l}</span>`;
+  }).join('\n');
+  ival.textContent = i < N ? i : '-';
+  jval.textContent = (i < N && j < N) ? j : '-';
+}
+
+function step() {
+  if (i >= N) {
+    render(END);
+    stopPlay();
+    return;
+  }
+
+  if (phase === 0) {
+    render(OUTER_HEADER);
+    phase = 1;
+  } else if (phase === 1) {
+    if (j >= N) {
+      render(OUTER_INCREMENT);
+      j = 0;
+      i++;
+      phase = 0;
+      return;
+    }
+    render(INNER_HEADER);
+    phase = 2;
+  } else if (phase === 2) {
+    render(BODY);
+    const idx = i * N + j;
+    cells[idx].style.background = '#3a6fd8';
+    cells[idx].style.transform = 'scale(1.1)';
+    setTimeout(() => { cells[idx].style.transform = 'scale(1)'; }, 150);
+    phase = 3;
+  } else if (phase === 3) {
+    render(INNER_INCREMENT);
+    j++;
+    phase = 1;
+  }
+}
+
+function togglePlay() {
+  playing = !playing;
+  if (playing) {
+    playBtn.textContent = '⏸ 일시정지';
+    timer = setInterval(step, Number(speedInput.value));
+  } else {
+    stopPlay();
+  }
+}
+
+function stopPlay() {
+  playing = false;
+  clearInterval(timer);
+  playBtn.textContent = '▶ 재생';
+}
+
+function resetSim() {
+  stopPlay();
+  i = 0; j = 0; phase = 0;
+  cells.forEach(c => { c.style.background = '#3a3a3a'; });
+  render([]);
+}
+
+speedInput.addEventListener('input', () => {
+  if (playing) {
+    clearInterval(timer);
+    timer = setInterval(step, Number(speedInput.value));
+  }
+});
+
+resetSim();
+</script>
+
+</body>
+</html>
